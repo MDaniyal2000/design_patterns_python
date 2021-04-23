@@ -238,16 +238,10 @@ def friends():
 @app.route('/sent_request', methods=['POST'])
 def sent_frequest():
     try:
-        current_user = User.query.filter_by(id=session['user_id']).first()
+        user_id = session['user_id']
         friend_id = request.form.get("friend_id","")
-        to_user = User.query.filter_by(id=friend_id).first()
-        sentRequest = SentRequest(requested_by=current_user, requested_to=friend_id)
-        db.session.add(sentRequest)
-        db.session.commit()
-
-        recdRequest = ReceivedRequest(requested_to=to_user, requested_by=session['user_id'])
-        db.session.add(recdRequest)
-        db.session.commit()
+        #To send request using Facade Pattern
+        network_manager.send_request(user_id, friend_id)
 
         return json.dumps({
             'message' : 'success'
@@ -260,14 +254,11 @@ def sent_frequest():
 @app.route('/cancel_request', methods=['POST'])
 def cancel_request():
     try:
+        user_id = session['user_id']
         request_id = request.form.get("request_id","")
-        sent_req = SentRequest.query.filter_by(id=request_id).first()
-        to_id = sent_req.requested_to
-        db.session.delete(sent_req)
-        db.session.commit()
-        recd_req = ReceivedRequest.query.filter_by(requested_by=session['user_id'], user_id=to_id).first()
-        db.session.delete(recd_req)
-        db.session.commit()
+        #To cancel request using Facade Pattern
+        network_manager.cancel_request(user_id, request_id)
+
         return json.dumps({
             'message' : 'success'
         })
@@ -279,14 +270,11 @@ def cancel_request():
 @app.route('/remove_request', methods=['POST'])
 def remove_request():
     try:
+        user_id = session['user_id']
         request_id = request.form.get("request_id","")
-        recd_req = ReceivedRequest.query.filter_by(id=request_id).first()
-        by_id = recd_req.requested_by
-        db.session.delete(recd_req)
-        db.session.commit()
-        sent_req = SentRequest.query.filter_by(requested_to=session['user_id'], user_id=by_id).first()
-        db.session.delete(sent_req)
-        db.session.commit()
+        #To remove request using Facade Pattern
+        network_manager.remove_request(user_id, request_id)
+
         return json.dumps({
             'message' : 'success'
         })
@@ -313,22 +301,10 @@ def delete_post():
 @app.route('/accept_request', methods=['POST'])
 def accept_request():
     try:
+        user_id = session['user_id']
         request_id = request.form.get("request_id","")
-        recd_req = ReceivedRequest.query.filter_by(id=request_id).first()
-        by_id = recd_req.requested_by
-        current_user = User.query.filter_by(id=session['user_id']).first()
-        new_friend = Friend(friend_of=current_user, friend_id=by_id)
-        db.session.add(new_friend)
-        db.session.commit()
-        other_user = User.query.filter_by(id=by_id).first()
-        again_friend = Friend(friend_of=other_user, friend_id=session['user_id'])
-        db.session.add(again_friend)
-        db.session.commit()
-        db.session.delete(recd_req)
-        db.session.commit()
-        sent_req = SentRequest.query.filter_by(requested_to=session['user_id'], user_id=by_id).first()
-        db.session.delete(sent_req)
-        db.session.commit()
+        #To accept request using Facade Pattern
+        network_manager.accept_request(user_id, request_id)
         return json.dumps({
             'message' : 'success'
         })
@@ -392,6 +368,9 @@ def unlike_post():
 if __name__ == '__main__':
     from models import *
 
+    #Create tables in db
+    db.create_all()
+
     #Singletom Class
     from singleton.singleton import CurrentUser
 
@@ -411,5 +390,10 @@ if __name__ == '__main__':
     action = Action()
     action.register('like', like_command)
     action.register('unlike', unlike_command)
+
+    ##Facade Pattern
+    from facade.facade import Facade
+
+    network_manager = Facade()
 
     app.run(host='0.0.0.0', debug=True)
